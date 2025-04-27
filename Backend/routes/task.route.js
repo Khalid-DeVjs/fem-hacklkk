@@ -6,20 +6,27 @@ import {
   updateTask,
   deleteTask,
   updateTaskStatus,
+  getMyTasks,
+  getAllRawTasks,
 } from '../controller/task.controller.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Protect all task routes
+router.use(protect);
+router.get('/mytasks', getMyTasks);
 // Base task routes
-router.get('/get', getTasks);          // GET /api/tasks
-router.post('/create', createTask);       // POST /api/tasks
+router.get('/get', getTasks);
+router.post('/create', createTask);
 
 // Task ID routes
-router.get('/getSingle/:id', getTask);        // GET /api/tasks/:id
-router.put('/update/:id', updateTask);     // PUT /api/tasks/:id
-router.delete('delete/:id', deleteTask);  // DELETE /api/tasks/:id
+router.get('/getSingle/:id', getTask);
+router.put('/update/:id', updateTask);
+router.delete('/delete/:id', deleteTask);
+router.get('/getAll/', getAllRawTasks);
 
 // Task status update
-router.put('single/:id/status', updateTaskStatus); // PUT /api/tasks/:id/status
+router.put('/single/:id/status', updateTaskStatus);
 
 export default router;

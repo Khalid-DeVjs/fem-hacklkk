@@ -1,5 +1,5 @@
 
-import Task from '../models/task.js';
+import Task from '../models/Task.js';
 import ErrorResponse from '../utils/errorResponse.js';
 
 // @desc    Get all tasks
@@ -43,17 +43,70 @@ export const getTask = async (req, res, next) => {
   } catch (err) {
     next(err);
   }
+
+
+
+
 };
+
+
+
+
+
+
+// @desc    Get all tasks for current user (created or assigned)
+// @route   GET /api/tasks/myalltasks
+// @access  Private
+export const getMyTasks = async (req, res, next) => {
+  try {
+    const tasks = await Task.find({
+      $or: [
+        { createdBy: req.user.id },
+        { assignedTo: req.user.id }
+      ]
+    })
+    .populate('assignedTo', 'name email')
+    .populate('createdBy', 'name email');
+
+    res.status(200).json({
+      success: true,
+      count: tasks.length,
+      data: tasks,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+
+export const getAllRawTasks = async (req, res, next) => {
+  try {
+    // Get EVERY task from the database
+    const tasks = await Task.find({});
+    
+    // Send raw task data
+    res.status(200).json({
+      success: true,
+      count: tasks.length,
+      data: tasks
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 
 // @desc    Create new task
 // @route   POST /api/tasks
 // @access  Private
 export const createTask = async (req, res, next) => {
   try {
-    // Add user to req.body
-    req.body.assignedTo = req.body.assignedTo || "680defbde03c471faed3ea6d"; // ✅ Default if not provided
-
-    // 4. Task Create کریں
+    // Add logged-in user as the assignedTo user
+    req.body.assignedTo = req.user.id; // Assuming your auth middleware adds user to req.user
+    
+    // Create task
     const task = await Task.create(req.body);
 
     res.status(201).json({
@@ -64,7 +117,6 @@ export const createTask = async (req, res, next) => {
     next(err);
   }
 };
-
 // @desc    Update task
 // @route   PUT /api/tasks/:id
 // @access  Private
@@ -103,27 +155,24 @@ export const deleteTask = async (req, res, next) => {
     const task = await Task.findById(req.params.id);
 
     if (!task) {
-      return next(
-        new ErrorResponse(`Task not found with id of ${req.params.id}`, 404)
-      );
+      return next(new ErrorResponse(`Task not found with id of ${req.params.id}`, 404));
     }
 
-    // Make sure user is task owner
+    // If task has no owner, allow deletion (or restrict to admins if needed)
+    if (!task.createdBy) {
+      console.warn(`Deleting orphaned task: ${task._id}`); // Log for debugging
+      await task.deleteOne();
+      return res.status(200).json({ success: true, data: {} });
+    }
+
+    // If task has an owner, check permissions
     if (task.createdBy.toString() !== req.user.id) {
-      return next(
-        new ErrorResponse(
-          `User ${req.user.id} is not authorized to delete this task`,
-          401
-        )
-      );
+      return next(new ErrorResponse(`User ${req.user.id} is not authorized to delete this task`, 401));
     }
 
     await task.deleteOne();
+    res.status(200).json({ success: true, data: {} });
 
-    res.status(200).json({
-      success: true,
-      data: {},
-    });
   } catch (err) {
     next(err);
   }
